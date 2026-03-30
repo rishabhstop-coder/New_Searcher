@@ -59,15 +59,18 @@ COMMON_BRANDS = [
 ]
 
 def get_domain(url):
-try:
-return urlparse(url).netloc.lower().replace("[www](http://www).", "")
-except Exception:
-return None
+    try:
+        # Correct the replace; it should be 'www.' instead of a markdown link
+        return urlparse(url).netloc.lower().replace("www.", "")
+    except Exception:
+        return None
 
 def is_blocked(url):
-domain = get_domain(url)
-if not domain:
-return True
+    domain = get_domain(url)
+    if not domain:
+        return True
+    # You may want to add additional blocking logic here
+    return False
 
 ```
 for b in BLOCKED_DOMAINS:
