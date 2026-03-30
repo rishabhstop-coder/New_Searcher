@@ -59,7 +59,7 @@ COMMON_BRANDS = [
 ]
 
 def get_domain(url):
-try:
+    try:
 return urlparse(url).netloc.lower().replace("[www](http://www).", "")
 except:
 return None
