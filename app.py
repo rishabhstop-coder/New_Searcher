@@ -10,9 +10,7 @@ from ddgs import DDGS
 from supabase import create_client
 
 # ==============================
-
 # CONFIG
-
 # ==============================
 
 st.set_page_config(layout="wide")
@@ -23,269 +21,238 @@ SUPABASE_KEY = "sb_publishable_BZ-OHKKeOdI3qOiz6MfvqQ_40EZOVlG"
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-EMAIL_REGEX = r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-z]{2,}"
+EMAIL_REGEX = r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-z]{2,}"
 
 # ==============================
-
 # INPUT
-
 # ==============================
 
 genre = st.text_input("Enter business niche", "dental")
 start = st.button("🚀 Start Scanning")
 
 # ==============================
-
 # BLOCKING SYSTEM
-
 # ==============================
 
 BLOCKED_DOMAINS = [
-"facebook","linkedin","instagram","youtube","twitter","x","tiktok",
-"google","bing","yahoo","microsoft","apple",
-"amazon","flipkart","ebay","alibaba","etsy",
-"yelp","justdial","sulekha","indiamart","tradeindia",
-"yellowpages","manta","angi","houzz","tripadvisor",
-"indeed","glassdoor","naukri",
-"github","stackoverflow","medium",
-"shopify","wix","wordpress.com","webflow","squarespace",
-"g2","capterra","producthunt","clutch","goodfirms",
-"reddit","quora","pinterest"
+    "facebook","linkedin","instagram","youtube","twitter","x","tiktok",
+    "google","bing","yahoo","microsoft","apple",
+    "amazon","flipkart","ebay","alibaba","etsy",
+    "yelp","justdial","sulekha","indiamart","tradeindia",
+    "yellowpages","manta","angi","houzz","tripadvisor",
+    "indeed","glassdoor","naukri",
+    "github","stackoverflow","medium",
+    "shopify","wix","wordpress.com","webflow","squarespace",
+    "g2","capterra","producthunt","clutch","goodfirms",
+    "reddit","quora","pinterest"
 ]
 
 COMMON_BRANDS = [
-"nike","adidas","apple","samsung","tesla",
-"netflix","uber","airbnb","spotify"
+    "nike","adidas","apple","samsung","tesla",
+    "netflix","uber","airbnb","spotify"
 ]
 
 def get_domain(url):
-try:
-return urlparse(url).netloc.lower().replace("[www](http://www).", "")
-except:
-return None
+    try:
+        return urlparse(url).netloc.lower().replace("www.", "")
+    except:
+        return None
 
 def is_blocked(url):
-domain = get_domain(url)
-if not domain:
-return True
-
-```
-for b in BLOCKED_DOMAINS:
-    if domain == b or domain.endswith("." + b) or b in domain:
+    domain = get_domain(url)
+    if not domain:
         return True
 
-if any(brand in domain for brand in COMMON_BRANDS):
-    return True
+    for b in BLOCKED_DOMAINS:
+        if domain == b or domain.endswith("." + b) or b in domain:
+            return True
 
-if any(x in url for x in ["wixsite.com","wordpress.com","weebly.com","webflow.io"]):
-    return True
+    if any(brand in domain for brand in COMMON_BRANDS):
+        return True
 
-return False
-```
+    if any(x in url for x in ["wixsite.com","wordpress.com","weebly.com","webflow.io"]):
+        return True
+
+    return False
 
 # ==============================
-
 # DORKS
-
 # ==============================
 
 DORKS = [
-'"{genre}" "contact us"',
-'"{genre}" "call us"',
-'"{genre}" "family owned"',
-'"{genre}" "since 20"',
-'"{genre}" "powered by wordpress"',
-'"{genre}" "website under construction"',
-'"{genre}" "local business"',
-'intitle:"{genre}" "services"',
+    '"{genre}" "contact us"',
+    '"{genre}" "call us"',
+    '"{genre}" "family owned"',
+    '"{genre}" "since 20"',
+    '"{genre}" "powered by wordpress"',
+    '"{genre}" "website under construction"',
+    '"{genre}" "local business"',
+    'intitle:"{genre}" "services"',
 ]
 
 # ==============================
-
 # SUPABASE FUNCTIONS
-
 # ==============================
 
 def save_lead(data):
-try:
-# Backward compatibility (DO NOT break old schema)
-data.setdefault("priority", "MEDIUM")
-data.setdefault("issues", "Auto-generated")
-
-```
-    supabase.table("leads").upsert(data).execute()
-except:
-    pass
-```
+    try:
+        # Backward compatibility (DO NOT break old schema)
+        data.setdefault("priority", "MEDIUM")
+        data.setdefault("issues", "Auto-generated")
+        supabase.table("leads").upsert(data).execute()
+    except:
+        pass
 
 def get_all_leads():
-try:
-res = supabase.table("leads").select("*").execute()
-return pd.DataFrame(res.data)
-except:
-return pd.DataFrame()
+    try:
+        res = supabase.table("leads").select("*").execute()
+        return pd.DataFrame(res.data)
+    except:
+        return pd.DataFrame()
 
 def mark_clicked(lead_id):
-try:
-supabase.table("leads").update({"clicked": True}).eq("id", lead_id).execute()
-except:
-pass
+    try:
+        supabase.table("leads").update({"clicked": True}).eq("id", lead_id).execute()
+    except:
+        pass
 
 def exists(domain):
-try:
-res = supabase.table("leads").select("domain").eq("domain", domain).limit(1).execute()
-return len(res.data) > 0
-except:
-return False
+    try:
+        res = supabase.table("leads").select("domain").eq("domain", domain).limit(1).execute()
+        return len(res.data) > 0
+    except:
+        return False
 
 # ==============================
-
 # SEARCH
-
 # ==============================
 
 def search_sites():
-urls = set()
-queries = random.sample(DORKS, len(DORKS))
+    urls = set()
+    queries = random.sample(DORKS, len(DORKS))
 
-```
-with DDGS() as ddgs:
-    for q in queries:
-        query = q.format(genre=genre)
+    with DDGS() as ddgs:
+        for q in queries:
+            query = q.format(genre=genre)
+            try:
+                results = ddgs.text(query, max_results=40)
+                for r in results:
+                    url = r["href"]
+                    if not is_blocked(url):
+                        urls.add(url)
+            except:
+                pass
 
-        try:
-            results = ddgs.text(query, max_results=40)
+            time.sleep(random.uniform(2, 4))
 
-            for r in results:
-                url = r["href"]
-                if not is_blocked(url):
-                    urls.add(url)
-
-        except:
-            pass
-
-        time.sleep(random.uniform(2, 4))
-
-return list(urls)
-```
+    return list(urls)
 
 # ==============================
-
 # AUDIT
-
 # ==============================
 
 def extract_email(text):
-emails = re.findall(EMAIL_REGEX, text)
-return emails[0] if emails else ""
+    emails = re.findall(EMAIL_REGEX, text)
+    return emails[0] if emails else ""
 
 def audit(url):
-try:
-if not url.startswith("http"):
-url = "http://" + url
+    try:
+        if not url.startswith("http"):
+            url = "http://" + url
 
-```
-    res = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
-    soup = BeautifulSoup(res.text, "html.parser")
-    text = soup.get_text().lower()
+        res = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
+        soup = BeautifulSoup(res.text, "html.parser")
+        text = soup.get_text().lower()
 
-    score = 0
-    issues = []
+        score = 0
+        issues = []
 
-    if not url.startswith("https"):
-        score += 3
-        issues.append("No HTTPS")
+        if not url.startswith("https"):
+            score += 3
+            issues.append("No HTTPS")
 
-    if not soup.find("meta", attrs={"name": "viewport"}):
-        score += 4
-        issues.append("Not mobile friendly")
+        if not soup.find("meta", attrs={"name": "viewport"}):
+            score += 4
+            issues.append("Not mobile friendly")
 
-    if re.search(r"©\s*(200\d|201[0-8])", text):
-        score += 3
-        issues.append("Outdated copyright")
+        if re.search(r"©\s*(200\d|201[0-8])", text):
+            score += 3
+            issues.append("Outdated copyright")
 
-    if len(res.text) > 800000:
-        score += 2
-        issues.append("Heavy page")
+        if len(res.text) > 800000:
+            score += 2
+            issues.append("Heavy page")
 
-    email = extract_email(res.text)
-    if not email:
-        score += 2
-        issues.append("No email")
+        email = extract_email(res.text)
+        if not email:
+            score += 2
+            issues.append("No email")
 
-    if not soup.find("nav"):
-        score += 2
-        issues.append("No navigation")
+        if not soup.find("nav"):
+            score += 2
+            issues.append("No navigation")
 
-    if not soup.find("footer"):
-        score += 1
-        issues.append("No footer")
+        if not soup.find("footer"):
+            score += 1
+            issues.append("No footer")
 
-    if "powered by wordpress" in text:
-        score += 2
-        issues.append("Old WordPress")
+        if "powered by wordpress" in text:
+            score += 2
+            issues.append("Old WordPress")
 
-    if "table" in str(soup):
-        score += 2
-        issues.append("Table layout")
+        if "table" in str(soup):
+            score += 2
+            issues.append("Table layout")
 
-    if "lorem ipsum" in text:
-        score += 5
-        issues.append("Dummy content")
+        if "lorem ipsum" in text:
+            score += 5
+            issues.append("Dummy content")
 
-    if score < 5:
+        if score < 5:
+            return None
+
+        if score >= 9:
+            priority = "HIGH"
+        elif score >= 6:
+            priority = "MEDIUM"
+        else:
+            priority = "LOW"
+
+        return {
+            "domain": get_domain(url),
+            "url": url,
+            "email": email,
+            "pitch_score": score,
+            "issues": ", ".join(issues),
+            "priority": priority,
+            "clicked": False
+        }
+
+    except:
         return None
 
-    if score >= 9:
-        priority = "HIGH"
-    elif score >= 6:
-        priority = "MEDIUM"
-    else:
-        priority = "LOW"
-
-    return {
-        "domain": get_domain(url),
-        "url": url,
-        "email": email,
-        "pitch_score": score,
-        "issues": ", ".join(issues),
-        "priority": priority,
-        "clicked": False
-    }
-
-except:
-    return None
-```
-
 # ==============================
-
 # MAIN
-
 # ==============================
 
 if start:
-st.info("Scanning...")
+    st.info("Scanning...")
 
-```
-urls = search_sites()
-st.write(f"Collected {len(urls)} sites")
+    urls = search_sites()
+    st.write(f"Collected {len(urls)} sites")
 
-new_count = 0
+    new_count = 0
 
-for url in urls:
-    data = audit(url)
+    for url in urls:
+        data = audit(url)
+        if data and not exists(data["domain"]):
+            save_lead(data)
+            new_count += 1
 
-    if data and not exists(data["domain"]):
-        save_lead(data)
-        new_count += 1
-
-st.success(f"New Leads Added: {new_count}")
-```
+    st.success(f"New Leads Added: {new_count}")
 
 # ==============================
-
-# DISPLAY (SAFE FOR OLD DATA)
-
+# DISPLAY
 # ==============================
 
 st.subheader("📊 All Leads")
@@ -293,38 +260,35 @@ st.subheader("📊 All Leads")
 df = get_all_leads()
 
 if not df.empty:
+    # Ensure compatibility with old DB
+    if "priority" not in df.columns:
+        df["priority"] = "UNKNOWN"
 
-```
-# Ensure compatibility with old DB
-if "priority" not in df.columns:
-    df["priority"] = "UNKNOWN"
+    if "issues" not in df.columns:
+        df["issues"] = "Not available"
 
-if "issues" not in df.columns:
-    df["issues"] = "Not available"
+    if "pitch_score" not in df.columns:
+        df["pitch_score"] = 0
 
-if "pitch_score" not in df.columns:
-    df["pitch_score"] = 0
+    if "domain" not in df.columns:
+        df["domain"] = "N/A"
 
-if "domain" not in df.columns:
-    df["domain"] = "N/A"
+    for _, row in df.iterrows():
+        col1, col2, col3 = st.columns([3, 1, 1])
 
-for _, row in df.iterrows():
-    col1, col2, col3 = st.columns([3, 1, 1])
+        domain = row.get("domain", "N/A")
+        score = row.get("pitch_score", 0)
+        priority = row.get("priority", "UNKNOWN")
+        issues = row.get("issues", "Not available")
 
-    domain = row.get("domain", "N/A")
-    score = row.get("pitch_score", 0)
-    priority = row.get("priority", "UNKNOWN")
-    issues = row.get("issues", "Not available")
+        col1.write(f"{domain} | Score: {score} | {priority}")
+        st.caption(f"Issues: {issues}")
 
-    col1.write(f"{domain} | Score: {score} | {priority}")
-    st.caption(f"Issues: {issues}")
+        if col2.button("Open", key=row["id"]):
+            mark_clicked(row["id"])
+            st.write(row["url"])
 
-    if col2.button("Open", key=row["id"]):
-        mark_clicked(row["id"])
-        st.write(row["url"])
-
-    col3.write("✅ Clicked" if row.get("clicked", False) else "❌ Not Clicked")
-```
+        col3.write("✅ Clicked" if row.get("clicked", False) else "❌ Not Clicked")
 
 else:
-st.warning("No leads yet")
+    st.warning("No leads yet")
