@@ -16,7 +16,7 @@ from supabase import create_client
 # ==============================
 
 st.set_page_config(layout="wide")
-st.title("🔥 Website Revamp Lead Finder (Final)")
+st.title("🔥 Website Revamp Lead Finder")
 
 SUPABASE_URL = "https://cdtysrgzgfrzwlkeacax.supabase.co"
 SUPABASE_KEY = "sb_publishable_BZ-OHKKeOdI3qOiz6MfvqQ_40EZOVlG"
@@ -59,7 +59,7 @@ COMMON_BRANDS = [
 ]
 
 def get_domain(url):
-    try:
+try:
 return urlparse(url).netloc.lower().replace("[www](http://www).", "")
 except:
 return None
@@ -156,7 +156,7 @@ return list(urls)
 
 # ==============================
 
-# AUDIT SYSTEM (IMPROVED)
+# AUDIT
 
 # ==============================
 
@@ -177,33 +177,27 @@ url = "http://" + url
     score = 0
     issues = []
 
-    # HTTPS
     if not url.startswith("https"):
         score += 3
         issues.append("No HTTPS")
 
-    # Mobile
     if not soup.find("meta", attrs={"name": "viewport"}):
         score += 4
         issues.append("Not mobile friendly")
 
-    # Old copyright
     if re.search(r"©\s*(200\d|201[0-8])", text):
         score += 3
         issues.append("Outdated copyright")
 
-    # Heavy page
     if len(res.text) > 800000:
         score += 2
         issues.append("Heavy page")
 
-    # Email
     email = extract_email(res.text)
     if not email:
         score += 2
         issues.append("No email")
 
-    # Structure
     if not soup.find("nav"):
         score += 2
         issues.append("No navigation")
@@ -212,7 +206,6 @@ url = "http://" + url
         score += 1
         issues.append("No footer")
 
-    # Tech signals
     if "powered by wordpress" in text:
         score += 2
         issues.append("Old WordPress")
@@ -221,7 +214,6 @@ url = "http://" + url
         score += 2
         issues.append("Table layout")
 
-    # UX issues
     if "lorem ipsum" in text:
         score += 5
         issues.append("Dummy content")
@@ -229,13 +221,7 @@ url = "http://" + url
     if score < 5:
         return None
 
-    # Priority
-    if score >= 9:
-        priority = "HIGH"
-    elif score >= 6:
-        priority = "MEDIUM"
-    else:
-        priority = "LOW"
+    priority = "HIGH" if score >= 9 else "MEDIUM" if score >= 6 else "LOW"
 
     return {
         "domain": get_domain(url),
@@ -258,10 +244,9 @@ except:
 # ==============================
 
 if start:
-
-```
 st.info("Scanning...")
 
+```
 urls = search_sites()
 st.write(f"Collected {len(urls)} sites")
 
