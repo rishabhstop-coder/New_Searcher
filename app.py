@@ -61,7 +61,7 @@ COMMON_BRANDS = [
 def get_domain(url):
 try:
 return urlparse(url).netloc.lower().replace("[www](http://www).", "")
-except:
+except Exception:
 return None
 
 def is_blocked(url):
@@ -109,19 +109,28 @@ DORKS = [
 def save_lead(data):
 try:
 supabase.table("leads").upsert(data).execute()
-except:
+except Exception:
 pass
 
 def get_all_leads():
+try:
 res = supabase.table("leads").select("*").execute()
 return pd.DataFrame(res.data)
+except Exception:
+return pd.DataFrame()
 
 def mark_clicked(lead_id):
+try:
 supabase.table("leads").update({"clicked": True}).eq("id", lead_id).execute()
+except Exception:
+pass
 
 def exists(domain):
+try:
 res = supabase.table("leads").select("domain").eq("domain", domain).limit(1).execute()
 return len(res.data) > 0
+except Exception:
+return False
 
 # ==============================
 
@@ -146,7 +155,7 @@ with DDGS() as ddgs:
                 if not is_blocked(url):
                     urls.add(url)
 
-        except:
+        except Exception:
             pass
 
         time.sleep(random.uniform(2, 4))
@@ -221,7 +230,12 @@ url = "http://" + url
     if score < 5:
         return None
 
-    priority = "HIGH" if score >= 9 else "MEDIUM" if score >= 6 else "LOW"
+    if score >= 9:
+        priority = "HIGH"
+    elif score >= 6:
+        priority = "MEDIUM"
+    else:
+        priority = "LOW"
 
     return {
         "domain": get_domain(url),
@@ -233,7 +247,7 @@ url = "http://" + url
         "clicked": False
     }
 
-except:
+except Exception:
     return None
 ```
 
@@ -273,8 +287,8 @@ st.subheader("📊 All Leads")
 df = get_all_leads()
 
 if not df.empty:
-for i, row in df.iterrows():
-col1, col2, col3 = st.columns([3,1,1])
+for _, row in df.iterrows():
+col1, col2, col3 = st.columns([3, 1, 1])
 
 ```
     col1.write(f"{row['domain']} | Score: {row['pitch_score']} | {row['priority']}")
