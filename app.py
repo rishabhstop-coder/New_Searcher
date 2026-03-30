@@ -22,31 +22,23 @@ SUPABASE_KEY = "sb_publishable_BZ-OHKKeOdI3qOiz6MfvqQ_40EZOVlG"
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 EMAIL_REGEX = r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-z]{2,}"
-
 HEADERS = {"User-Agent": "Mozilla/5.0"}
 
 # ==============================
 # INPUT
 # ==============================
 
-genre = st.text_input("Enter business niche", "dental")
+genre = st.text_input("Enter business niche", "real estate")
 start = st.button("🚀 Start Scanning")
 
 # ==============================
-# BLOCKING SYSTEM (UNCHANGED LOGIC, CLEANED)
+# BLOCKING SYSTEM
 # ==============================
 
 BLOCKED_DOMAINS = [
     "facebook","linkedin","instagram","youtube","twitter","x","tiktok",
-    "google","bing","yahoo","microsoft","apple",
-    "amazon","flipkart","ebay","alibaba","etsy",
-    "yelp","justdial","sulekha","indiamart","tradeindia",
-    "yellowpages","manta","angi","houzz","tripadvisor",
-    "indeed","glassdoor","naukri",
-    "github","stackoverflow","medium",
-    "shopify","wix","wordpress.com","webflow","squarespace",
-    "g2","capterra","producthunt","clutch","goodfirms",
-    "reddit","quora","pinterest"
+    "google","bing","yahoo","amazon","flipkart","ebay",
+    "indeed","glassdoor","naukri","reddit","quora","pinterest"
 ]
 
 def get_domain(url):
@@ -62,7 +54,7 @@ def is_blocked(url):
     return any(b in domain for b in BLOCKED_DOMAINS)
 
 # ==============================
-# SMART DORKS (IMPROVED)
+# DORK GENERATION
 # ==============================
 
 def generate_dorks(niche):
@@ -70,21 +62,19 @@ def generate_dorks(niche):
         f'"{niche}" "contact us"',
         f'"{niche}" "call us"',
         f'intitle:"{niche}" "services"',
-        f'"{niche}" "family owned"',
         f'"powered by wordpress" "{niche}"',
         f'inurl:contact "{niche}"',
     ]
 
 # ==============================
-# SEARCH (FASTER + CLEAN)
+# SEARCH
 # ==============================
 
 def search_sites(niche):
     urls = set()
-    dorks = generate_dorks(niche)
 
     with DDGS() as ddgs:
-        for query in dorks:
+        for query in generate_dorks(niche):
             try:
                 results = ddgs.text(query, max_results=30)
                 for r in results:
@@ -99,11 +89,11 @@ def search_sites(niche):
     return list(urls)
 
 # ==============================
-# REQUEST WITH RETRY
+# REQUEST (RETRY SAFE)
 # ==============================
 
 def fetch(url):
-    for _ in range(2):  # retry twice
+    for _ in range(2):
         try:
             return requests.get(url, headers=HEADERS, timeout=8)
         except:
@@ -111,7 +101,7 @@ def fetch(url):
     return None
 
 # ==============================
-# AUDIT (SAME STRUCTURE, BETTER LOGIC)
+# AUDIT
 # ==============================
 
 def extract_email(text):
@@ -141,47 +131,36 @@ def audit(url):
             score += 4
             issues.append("Not mobile friendly")
 
-        if re.search(r"©\s*(200\d|201[0-8])", text):
-            score += 3
-            issues.append("Outdated copyright")
+        if "lorem ipsum" in text:
+            score += 5
+            issues.append("Dummy content")
 
-        if len(res.text) > 800000:
+        if "powered by wordpress" in text:
             score += 2
-            issues.append("Heavy page")
+            issues.append("Old WordPress")
+
+        if not soup.find("footer"):
+            score += 1
+            issues.append("No footer")
+
+        if not soup.find("nav"):
+            score += 2
+            issues.append("No navigation")
 
         email = extract_email(res.text)
         if not email:
             score += 2
             issues.append("No email")
 
-        if not soup.find("nav"):
-            score += 2
-            issues.append("No navigation")
-
-        if not soup.find("footer"):
-            score += 1
-            issues.append("No footer")
-
-        if "powered by wordpress" in text:
-            score += 2
-            issues.append("Old WordPress")
-
-        if "table" in str(soup):
-            score += 2
-            issues.append("Table layout")
-
-        if "lorem ipsum" in text:
-            score += 5
-            issues.append("Dummy content")
-
         if score < 5:
             return None
 
-        priority = "LOW"
         if score >= 9:
             priority = "HIGH"
         elif score >= 6:
             priority = "MEDIUM"
+        else:
+            priority = "LOW"
 
         return {
             "domain": get_domain(url),
@@ -198,8 +177,15 @@ def audit(url):
         return None
 
 # ==============================
-# SUPABASE (UNCHANGED STRUCTURE)
+# DATABASE (UNCHANGED STRUCTURE)
 # ==============================
+
+def exists(domain):
+    try:
+        res = supabase.table("leads").select("domain").eq("domain", domain).limit(1).execute()
+        return len(res.data) > 0
+    except:
+        return False
 
 def save_lead(data):
     try:
@@ -209,17 +195,24 @@ def save_lead(data):
     except Exception as e:
         st.error(f"Save error: {e}")
 
-def exists(domain):
-    try:
-        res = supabase.table("leads").select("domain").eq("domain", domain).limit(1).execute()
-        return len(res.data) > 0
-    except:
-        return False
-
 def get_all_leads():
     try:
         res = supabase.table("leads").select("*").execute()
-        return pd.DataFrame(res.data)
+        df = pd.DataFrame(res.data)
+
+        # FIX ALL MISSING COLUMNS HERE (NO MORE KEYERROR EVER)
+        for col, default in {
+            "domain": "N/A",
+            "pitch_score": 0,
+            "priority": "UNKNOWN",
+            "issues": "Not available",
+            "clicked": False
+        }.items():
+            if col not in df.columns:
+                df[col] = default
+
+        return df
+
     except:
         return pd.DataFrame()
 
@@ -243,6 +236,7 @@ if start:
 
     for url in urls:
         domain = get_domain(url)
+
         if not domain or exists(domain):
             continue
 
@@ -255,7 +249,7 @@ if start:
     st.success(f"New Leads Added: {new_count}")
 
 # ==============================
-# DISPLAY (UNCHANGED UX)
+# DISPLAY
 # ==============================
 
 st.subheader("📊 All Leads")
@@ -263,18 +257,15 @@ st.subheader("📊 All Leads")
 df = get_all_leads()
 
 if not df.empty:
-    if "priority" not in df.columns:
-        df["priority"] = "UNKNOWN"
-
     for _, row in df.iterrows():
         col1, col2, col3 = st.columns([3, 1, 1])
 
-        col1.write(f"{row['domain']} | Score: {row['pitch_score']} | {row['priority']}")
-        st.caption(f"Issues: {row['issues']}")
+        col1.write(f"{row.get('domain')} | Score: {row.get('pitch_score')} | {row.get('priority')}")
+        st.caption(f"Issues: {row.get('issues')}")
 
         if col2.button("Open", key=row["id"]):
             mark_clicked(row["id"])
-            st.write(row["url"])
+            st.write(row.get("url"))
 
         col3.write("✅ Clicked" if row.get("clicked") else "❌ Not Clicked")
 
